@@ -128,73 +128,67 @@ most_bytes_sent() {
 }
 
 # arg1 - Which column contains the ip adresses
-# arg2 - The final output
 blacklisted_ips() {
     echo "${output}" > tmpfile.txt
     while read p; do
+        [ -z "$p" ] && newOutput="${newOutput}\n" && continue
         ipaddr=`echo "$p" | awk -v column="$1" '{print $column}'`
-        test=`nslookup ${ipaddr} | awk 'FNR == 1 {print $4}' | grep -oE "[^.]*\.[^.]{1,3}\."`
-        domain=`echo "${test%?}"`
-        domain=`[ -z ${domain} ] 2> /dev/null && echo "0" || echo "${domain}"`
-        domainCheck=`grep -cE ${domain} dns.blacklist.txt`;
+        test=$(nslookup "${ipaddr}" | grep -v "can't find" | awk -F'.' 'FNR == 1 {print $0}')
+        testCheck=`echo "${test}" | grep -cv "can't find"`
+        [ "${#test}" -gt 0 ] 2> /dev/null && domain=$(echo "${test}" | awk -F'.' 'FNR == 1 {print $(NF-2),".",$(NF-1)}' | sed s"/ //g"| grep -E "*\.[^(0-9).]{1,3}")
+        domainCheck=`[ "${#domain}" -eq 0 ] 2> /dev/null && echo "0" || grep -cE "${domain}" dns.blacklist.txt`
 
         [ ! ${domainCheck} -eq 0 ] 2> /dev/null\
         && newOutput="${newOutput}\n$p\t*Blacklisted!*"\
-        || newOutput="${newOutput}\n$p"
+        || newOutput="${newOutput}\n$p" 
 
     done <tmpfile.txt
 
     rm tmpfile.txt
-    echo "${newOutput}" | tail -n +2
+    output=`echo "${newOutput}" | tail -n +2`
 }
-# Funktion som tar in vilken column som innehåller ip addresserna.
-# Den tar sedan denna column och loopar igenom mot blacklisten.
-# Denna funktion sköter också den slutgiltiga utskriften?
 
 case $type in 
     -c)
         connection_attempts
         output=`[ $argj -gt 0 ] 2> /dev/null && echo "${output}" | head -$argj || echo "${output}"`
         if [ $blacklist  -gt 0 ]; then
-            blacklisted_ips 1 $output
-        else
-            echo "${output}"
+            blacklisted_ips 1
         fi
+            echo "${output}"
         ;;
     -2)
         successful_connection_attempts
         output=`[ $argj -gt 0 ] 2> /dev/null && echo "${output}" | head -$argj || echo "${output}"`
         if [ $blacklist -gt 0 ]; then
-            blacklisted_ips 1 $output
-        else
-            echo "${output}"
+            blacklisted_ips 1
+            output=`echo "${output}" | tail -n +1`
         fi
+            echo "${output}"
         ;;
     -r)
         most_common_result_codes
         output=`echo "${output}" | head -n -2`
         if [ $blacklist -gt 0 ]; then
-            blacklisted_ips 2 $output
-        else
-            echo "${output}"
+            blacklisted_ips 2
         fi
+            echo "${output}"
         ;;
     -F)
         most_common_failure_result_codes
+        output=`echo "${output}" | head -n -2`
         if [ $blacklist -gt 0 ]; then
-            blacklisted_ips 1 $output
-        else
-            echo "${output}"
+            blacklisted_ips 1
+            output=`echo "${output}" | tail -n +2`
         fi
-        echo "${output}" | head -n -2
+            echo "${output}"
         ;;
     -t)
         most_bytes_sent
-        output=`echo "${output}" | head -$argj`
+        output=`[ $argj -gt 0 ] 2> /dev/null && echo "${output}" | head -$argj || echo "${output}"`
         if [ $blacklist -gt 0 ]; then
             blacklisted_ips 1
-        else
-            echo "${output}"
         fi
+            echo "${output}"
         ;;
 esac
