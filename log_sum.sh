@@ -14,6 +14,7 @@ no filename is given, then standard input should be read. This
 enables the script to be used in a pipeline.
 "
 
+# Check how many arguments there is
 if [ $# -lt 1 ] || [ $# -gt 5 ]; then
 	# access the usage variable and print out its content to stdout
 	echo "$USAGE"
@@ -24,10 +25,13 @@ fi
 typeCount=0
 argj=0
 blacklist=0
+# $# = number of arguments
+# Loop while (i += 1) <= $#, the -ne 0 checks if it's false or not
 while [ $(( (i += 1) <= $#)) -ne 0 ]; do 
     eval "arg=\$$i"
     case $arg in
         -n)
+            # Gotta do this to make it possible to add to i, the reason for adding to i is so we can get the number after n
             i=$(( $i+1 ))
             eval "argj=\$$i"
             if ! [ $argj -gt 0 ] 2> /dev/null; then
@@ -38,6 +42,7 @@ while [ $(( (i += 1) <= $#)) -ne 0 ]; do
             blacklist=1
             ;;
         -c|-2|-r|-F|-t)
+            # typecount is needed to ensure only one flag is there
             [ $typeCount -gt 0 ] && echo "Only one of (-c|-2|-r|-F|-t) is allowed" && exit 1
             typeCount=$(( $typeCount + 1 ))
             type=$arg
@@ -47,6 +52,7 @@ while [ $(( (i += 1) <= $#)) -ne 0 ]; do
     esac
 done
 
+# -z == zero
 if [ -z $filename ] || [ "$filename" = '-' ]; then
     # read from stdin and assign filename to the user input
     read line
@@ -129,6 +135,7 @@ most_bytes_sent() {
 
 # arg1 - Which column contains the ip adresses
 blacklisted_ips() {
+    # Needs to be read to tmpfile because you can't read a multiline variable line by line in posix shell
     echo "${output}" > tmpfile.txt
     while read p; do
         [ -z "$p" ] && newOutput="${newOutput}\n" && continue
